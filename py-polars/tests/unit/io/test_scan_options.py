@@ -691,6 +691,32 @@ def test_scan_cast_options_datetime_wrong_direction(
         q.collect(engine=engine)
 
 
+@pytest.mark.parametrize("time_zone", ["UTC", "Europe/Rome"])
+@pytest.mark.parametrize("naive_first", [True, False])
+@pytest.mark.parametrize("engine", ["in-memory", "streaming"])
+def test_scan_cast_options_datetime_naive_vs_aware_raises(
+    time_zone: str,
+    naive_first: bool,
+    engine: EngineType,
+) -> None:
+    # https://github.com/pola-rs/polars/issues/29458
+    naive = pl.DataFrame({"t": [datetime(2024, 1, 1, 12)]})
+    aware = naive.with_columns(pl.col("t").dt.replace_time_zone(time_zone))
+    dfs = [naive, aware] if naive_first else [aware, naive]
+
+    files: list[IO[bytes]] = [io.BytesIO(), io.BytesIO()]
+    for df, f in zip(dfs, files, strict=True):
+        df.write_parquet(f)
+        f.seek(0)
+
+    q = pl.scan_parquet(files)
+    with pytest.raises(
+        SchemaError,
+        match=r"hint: pass cast_options=pl.ScanCastOptions\(datetime_cast='convert-timezone'\)",
+    ):
+        q.collect(engine=engine)
+
+
 def test_scan_cast_options_datetime_unknown_option() -> None:
     f = io.BytesIO()
     pl.select(

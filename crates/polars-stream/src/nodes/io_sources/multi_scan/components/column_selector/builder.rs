@@ -403,12 +403,10 @@ impl ColumnSelectorBuilder {
             DataType::Datetime(incoming_unit, incoming_zone),
         ) = (target_dtype, incoming_dtype)
         {
-            use polars_core::prelude::{TimeUnit, TimeZone};
+            use polars_core::prelude::TimeUnit;
 
             // Check timezone
-            if !self.cast_columns_policy.datetime_convert_timezone
-                && !TimeZone::eq_none_as_utc(incoming_zone.as_ref(), target_zone.as_ref())
-            {
+            if !self.cast_columns_policy.datetime_convert_timezone && incoming_zone != target_zone {
                 return mismatch_err(
                     "hint: pass cast_options=pl.ScanCastOptions(datetime_cast='convert-timezone')",
                 );
